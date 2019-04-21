@@ -1,0 +1,1108 @@
+///*********************************************** DEFINITIONS ***********************************************\\\
+
+
+#include <FEHLCD.h>
+#include <FEHIO.h>
+#include <FEHUtility.h>
+#include <FEHMotor.h>
+#include <FEHRPS.h>
+#include <FEHServo.h>
+#include <FEHBattery.h>
+
+
+///*********************************************** DECLARATIONS ***********************************************\\\
+
+
+/// encoder declarations
+DigitalEncoder right_encoder(FEHIO::P3_7);
+DigitalEncoder left_encoder(FEHIO::P0_0);
+DigitalEncoder back_encoder(FEHIO::P3_0);
+/// motor declarations
+FEHMotor right_motor(FEHMotor::Motor0,9.0);
+FEHMotor left_motor(FEHMotor::Motor1,9.0);
+FEHMotor back_motor(FEHMotor::Motor3,9.0);
+/// servo declaration
+FEHServo arm_servo(FEHServo::Servo4);
+/// cds declaration
+AnalogInputPin cds(FEHIO::P1_0);
+/// bump switch declaration
+DigitalInputPin bump(FEHIO::P2_0);
+
+
+///*********************************************** CONTROL METHODS ***********************************************\\\
+
+
+///************************ MOVE FORWARDS/BACKWARDS ************************\\\
+/// control method: MOVE FORWARDS
+/// using encoder counts, set the RIGHT, LEFT and BACK motors to a desired percent
+void move_forwards(int right_percent, int left_percent, int back_percent, int counts)
+{
+    // reset encoder counts
+    right_encoder.ResetCounts();
+    left_encoder.ResetCounts();
+    back_encoder.ResetCounts();
+
+
+    // set both motors to desired percent
+    right_motor.SetPercent(right_percent);
+    left_motor.SetPercent(-left_percent);
+    back_motor.SetPercent(back_percent);
+
+
+    // while the average of the left and right encoder is less than counts,
+    // keep running motors
+    while((back_encoder.Counts() + right_encoder.Counts() + left_encoder.Counts()) / 2 < counts);
+
+
+    // turn off motors
+    right_motor.Stop();
+    left_motor.Stop();
+    back_motor.Stop();
+}
+
+
+/// control method: MOVE BACKWARDS
+/// using encoder counts, set the RIGHT, LEFT and BACK motors to a desired percent
+void move_backwards(int right_percent, int left_percent, int back_percent, int counts)
+{
+    // reset encoder counts
+    right_encoder.ResetCounts();
+    left_encoder.ResetCounts();
+    back_encoder.ResetCounts();
+
+
+    // set both motors to desired percent
+    right_motor.SetPercent(-right_percent);
+    left_motor.SetPercent(left_percent);
+    back_motor.SetPercent(-back_percent);
+
+
+    // while the average of the left and right encoder is less than counts,
+    // keep running motors
+    while((back_encoder.Counts() + right_encoder.Counts() + left_encoder.Counts()) / 2 < counts);
+
+
+    // turn off motors
+    right_motor.Stop();
+    left_motor.Stop();
+    back_motor.Stop();
+}
+
+
+///************************ MOVE SERVO ARM UP/DOWN ************************\\\
+
+
+/// control method: ARM DOWN
+/// set the servo arm to a lowered position
+void arm_down(int degree)
+{
+    // set minimum and maximum servo rotation
+    arm_servo.SetMin(600);
+    arm_servo.SetMax(2400);
+
+
+    // display arm status
+    LCD.WriteLine("Arm is lowered. ");
+
+
+    // set servo degree
+    arm_servo.SetDegree(degree);
+}
+
+
+/// control method: ARM UP
+/// set the servo arm to a raised position
+void arm_up (int degree)
+{
+    // set minimum and maximum servo rotation
+    arm_servo.SetMin(600);
+    arm_servo.SetMax(2400);
+
+
+    // display arm status
+    LCD.WriteLine("Arm is raised. ");
+
+
+    // set arvo degree
+    arm_servo.SetDegree(degree);
+}
+
+
+///************************ OMNI MOVEMENTS DIAGONAL/SIDEWAYS ************************\\\
+
+
+/// control method: MOVE DIAGONAL
+/// using encoder counts, set the RIGHT, LEFT and BACK motors to a desired percent
+void go_diagonal(int percent, int counts)
+{
+    // reset encoder counts
+    right_encoder.ResetCounts();
+    back_encoder.ResetCounts();
+
+
+    // set both motors to desired percent
+    // set right motor backwards, left motor forwards
+    right_motor.SetPercent(percent);
+    back_motor.SetPercent(-percent - 7);
+
+
+    while((right_encoder.Counts() + back_encoder.Counts()) / 2.0 < counts);
+
+
+    // turn off motors
+    right_motor.Stop();
+    back_motor.Stop();
+}
+
+
+/// control method: MOVE SIDEWAYS
+/// using encoder counts, set the RIGHT, LEFT and BACK motors to a desired percent
+void move_sideways(char direction, int counts)
+{
+    // move left
+    if(direction == 'l')
+    {
+        move_backwards(-30, 23, 40, counts);
+    }
+
+
+    // move right
+    else if (direction == 'r')
+    {
+        move_backwards(30, -23, -40, counts);
+    }
+}
+
+
+///************************ TURNS/PIVOTS ************************\\\
+
+
+/// control method: PIVOT COUNTERCLOCKWISE
+/// rotate the robot counterclockwise without moving directionally
+void pivot_ccw(int percent, int counts)
+{
+    // reset encoder counts
+    right_encoder.ResetCounts();
+    left_encoder.ResetCounts();
+    back_encoder.ResetCounts();
+
+
+    // set both motors to desired percent
+    //set right motor backwards, left motor forwards
+    right_motor.SetPercent(percent);
+    left_motor.SetPercent(percent);
+    back_motor.SetPercent(percent);
+
+
+    while((back_encoder.Counts() + right_encoder.Counts() + left_encoder.Counts()) / 3 < counts);
+
+
+    // turn off motors
+    right_motor.Stop();
+    left_motor.Stop();
+    back_motor.Stop();
+}
+
+
+/// control method: PIVOT CLOCKWISE
+/// rotate the robo clockwise without moving directionally
+void pivot_cw(int percent,int counts)
+{
+    // reset encoder counts
+    right_encoder.ResetCounts();
+    left_encoder.ResetCounts();
+    back_encoder.ResetCounts();
+
+
+    // set both motors to desired percent
+    // set right motor backwards, left motor forwards
+    right_motor.SetPercent(-percent);
+    left_motor.SetPercent(-percent);
+    back_motor.SetPercent(-percent);
+
+
+    while((back_encoder.Counts() + right_encoder.Counts() + left_encoder.Counts()) / 3 < counts);
+
+
+    // turn off motors
+    right_motor.Stop();
+    left_motor.Stop();
+    back_motor.Stop();
+}
+
+
+/// control method: TURN RIGHT
+/// turn robot to the right
+void turn_right(int percent, int counts)
+{
+    // reset encoder counts
+    right_encoder.ResetCounts();
+    left_encoder.ResetCounts();
+
+
+    // set both motors to desired percent
+    // set right motor backwards, left motor forwards
+    right_motor.SetPercent(percent + 5);
+    left_motor.SetPercent(percent);
+
+
+    while((right_encoder.Counts() + left_encoder.Counts()) / 2.0 < counts);
+
+
+    // turn off motors
+    right_motor.Stop();
+    left_motor.Stop();
+}
+
+
+/// control method: TURN LEFT
+/// turn robot to the left
+void turn_left(int percent, int counts)
+{
+    // reset encoder counts
+    right_encoder.ResetCounts();
+    left_encoder.ResetCounts();
+
+
+    // set both motors to desired percent
+    // set right motor backwards,left motor forwards
+    right_motor.SetPercent(percent);
+    left_motor.SetPercent(percent + 5);
+
+
+    while((right_encoder.Counts() + left_encoder.Counts()) / 2.0 < counts);
+
+
+    // turn off motors
+    right_motor.Stop();
+    left_motor.Stop();
+}
+
+
+///************************ RPS CHECKS ************************\\\
+
+
+/// control method: CHECK x (PLUS)
+/// check RPS x-coordinates while the robot is facing the foosball sliders (+x direction)
+/// move side to side
+void check_x_plus(float x_coordinate)
+{
+    // check whether the robot is within an acceptable range
+    while(RPS.X() < x_coordinate - 0.25 || RPS.X() > x_coordinate + 0.25)
+    {
+        if(RPS.X() < x_coordinate)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25) ;
+            // move sideways to the right
+            move_sideways('l', 3);
+        }
+
+
+        else if(RPS.X() > x_coordinate)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            // move sideways to the left
+            move_sideways('r', 3);
+        }
+
+
+        Sleep(0.25);
+    }
+}
+
+
+/// control method: CHECK x (MINUS)
+/// check RPS x-coordinates while the robot is facing the DDR machine (-x direction)
+/// move side to side
+void check_x_minus(float x_coordinate)
+{
+    // check whether the robot is within an acceptable range
+    while(RPS.X() < x_coordinate - 0.20 || RPS.X() > x_coordinate + 0.20)
+    {
+        if(RPS.X() > x_coordinate)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            // update the x-coordinate
+            LCD.WriteRC(RPS.X(), 2, 12);
+            // move sideways to the left
+            move_sideways('l', 3);
+        }
+
+
+        else if(RPS.X() < x_coordinate)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            // update the x coordinate
+            LCD.WriteRC(RPS.X(), 2, 12);
+            // move sideways to the right
+            move_sideways('r', 3);
+        }
+
+
+        Sleep(0.25);
+    }
+}
+
+
+/// control method: CHECK y (MINUS)
+/// check RPS y-coordinates while the robot is facing the LEFT WALL (-y direction)
+/// move forwards and backwards
+void check_y_minus(float y_coordinate)
+{
+    // check whether the robot is within an acceptable range
+    while(RPS.Y() < y_coordinate - 0.25 || RPS.Y() > y_coordinate + 0.25)
+    {
+        if(RPS.Y() > y_coordinate)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            move_forwards(15, 15, 0, 3);
+        }
+        else if(RPS.Y() < y_coordinate)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            move_backwards(15, 15, 0, 3);
+        }
+
+
+        Sleep(0.25);
+    }
+}
+
+
+/// control method: CHECK y (PLUS)
+/// check RPS y-coordinates while the robot is facing the RIGHT WALL (+y direction).
+/// move fowards and backwards
+void check_y_plus(float y_coordinate)
+{
+    // check whether the robot is within an acceptable range
+    while(RPS.Y() < y_coordinate - 0.25 || RPS.Y() > y_coordinate + 0.25)
+    {
+        if(RPS.Y() > y_coordinate)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            move_backwards(15, 15, 0, 3);
+        }
+
+
+        else if(RPS.Y() < y_coordinate)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            move_forwards(15, 15, 0, 3);
+        }
+
+
+        Sleep(0.25);
+    }
+}
+
+
+/// control method: CHECK HEADING
+/// check RPS heading
+void check_heading(float heading)
+{
+    // check whether the robot is within an acceptable range
+    while(RPS.Heading() < heading - 3 || RPS.Heading() > heading + 3)
+    {
+        if(RPS.Heading() > heading)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            pivot_cw(20, 3);
+        }
+
+
+        else if(RPS.Heading() < heading)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            pivot_ccw(20, 3);
+
+
+        }
+    }
+}
+
+
+
+
+
+
+
+
+///********************************************************* MAIN METHOD ********************************************************\\\
+
+
+
+
+
+
+
+
+int main(void)
+{
+    int piv90= 78;
+    int piv180=156;
+    float time;
+    float touch_x, touch_y;
+
+
+    RPS.InitializeTouchMenu();
+
+
+    LCD.WriteLine("The Battery is at: ");
+    LCD.Write(Battery.Voltage());
+
+
+    // wait for screen to start RPS checks
+    LCD.WriteLine("Press screen to start RPS check sequence. ");
+    while(!LCD.Touch(&touch_x,&touch_y));
+    LCD.Clear();
+
+
+    ///******************* INITIAL RPS TOUCH COORDINATES *******************\\\
+
+
+    float coinRPSX;
+    float coinRPSY;
+    float coinRPSZ;
+    float ddrRPSX;
+    float ddrRPSY;
+    float ddrRPSZ;
+    float wbRPSX;
+    float wbRPSY;
+    float wbRPSZ;
+    float rampRPSX;
+    float rampRPSY;
+    float rampRPSZ;
+    float ramp2RPSX;
+    float ramp2RPSY;
+    float ramp2RPSZ;
+    float ramp3RPSX;
+    float ramp3RPSY;
+    float ramp3RPSZ;
+    float ramp4RPSX;
+    float ramp4RPSY;
+    float ramp4RPSZ;
+    float foosRPSX;
+    float foosRPSY;
+    float foosRPSZ;
+    float levRPSX;
+    float levRPSY;
+    float levRPSZ;
+    float finRPSX;
+    float finRPSY;
+    float finRPSZ;
+
+
+    // COIN SLOT RPS
+    LCD.WriteLine("Press switch to store RPS in front of the COIN SLOT. ");
+    //wait until bump switch is pressed
+    while (bump.Value() == true);
+    // store COIN SLOT RPS in variables coinRPSX, coinRPSY, coinRPSZ
+    coinRPSX = RPS.X();
+    coinRPSY = RPS.Y();
+    coinRPSZ = RPS.Heading();
+
+
+    LCD.WriteLine(" ");
+    LCD.Write("X: ");
+    LCD.WriteLine(coinRPSX);
+    LCD.Write("Y: ");
+    LCD.WriteLine(coinRPSY);
+    LCD.Write("Z: ");
+    LCD.WriteLine(coinRPSZ);
+    Sleep(2.0);
+    LCD.Clear();
+
+
+    // DDR RPS
+    LCD.WriteLine("Press bump switch to store RPS in front of DDR. ");
+    while (bump.Value() == true);
+    // store DDR RPS in variables ddrRPSX, ddrRPSY, ddrRPSZ
+    ddrRPSX = RPS.X();
+    ddrRPSY = RPS.Y();
+    ddrRPSZ = RPS.Heading();
+
+
+    LCD.WriteLine(" ");
+    LCD.Write("X: ");
+    LCD.WriteLine(ddrRPSX);
+    LCD.Write("Y: ");
+    LCD.WriteLine(ddrRPSY);
+    LCD.Write("Z: ");
+    LCD.WriteLine(ddrRPSZ);
+    Sleep(2.0);
+    LCD.Clear();
+
+
+    // WHITE BUTTON RPS
+    LCD.WriteLine("Press bump switch to store RPS in front of WHITE BUTTON. ");
+    while (bump.Value() == true);
+    // store DDR RPS in variables ddrRPSX, ddrRPSY, ddrRPSZ
+    wbRPSX = RPS.X();
+    wbRPSY = RPS.Y();
+    wbRPSZ = RPS.Heading();
+
+
+    LCD.WriteLine(" ");
+    LCD.Write("X: ");
+    LCD.WriteLine(wbRPSX);
+    LCD.Write("Y: ");
+    LCD.WriteLine(wbRPSY);
+    LCD.Write("Z: ");
+    LCD.WriteLine(wbRPSZ);
+    Sleep(2.0);
+    LCD.Clear();
+
+
+    // RAMP 1 RPS
+    LCD.WriteLine("Press bump switch to store RPS at the bottom of the RAMP. ");
+    while (bump.Value() == true);
+    rampRPSX = RPS.X();
+    rampRPSY = RPS.Y();
+    rampRPSZ = RPS.Heading();
+
+
+    LCD.WriteLine(" ");
+    LCD.Write("X: ");
+    LCD.WriteLine(rampRPSX);
+    LCD.Write("Y: ");
+    LCD.WriteLine(rampRPSY);
+    LCD.Write("Z: ");
+    LCD.WriteLine(rampRPSZ);
+    Sleep(2.0);
+    LCD.Clear();
+
+
+    // RAMP 2 RPS
+    LCD.WriteLine("Press screen to store RPS at the top of the RAMP. ");
+    while (bump.Value() == true);
+    // store RAMP RPS in variables ramp2RPSX, ramp2RPSY, ramp2RPSZ
+    ramp2RPSX = RPS.X();
+    ramp2RPSY = RPS.Y();
+    ramp2RPSZ = RPS.Heading();
+
+
+    LCD.WriteLine(" ");
+    LCD.Write("X: ");
+    LCD.WriteLine(ramp2RPSX);
+    LCD.Write("Y: ");
+    LCD.WriteLine(ramp2RPSY);
+    LCD.Write("Z: ");
+    LCD.WriteLine(ramp2RPSZ);
+    Sleep(2.0);
+    LCD.Clear();
+
+
+    // FOOSBALL RPS
+    LCD.WriteLine("Press bump switch to store RPS at the FOOSBALL. ");
+    while (bump.Value() == true);
+    foosRPSX = RPS.X();
+    foosRPSY = RPS.Y();
+    foosRPSZ = RPS.Heading();
+
+
+    LCD.WriteLine(" ");
+    LCD.Write("X: ");
+    LCD.WriteLine(foosRPSX);
+    LCD.Write("Y: ");
+    LCD.WriteLine(foosRPSY);
+    LCD.Write("Z: ");
+    LCD.WriteLine(foosRPSZ);
+    Sleep(2.0);
+    LCD.Clear();
+
+
+    // RAMP 3 RPS
+    LCD.WriteLine("Press bump switch to store RPS at the top of the RAMP. ");
+    while (bump.Value() == true);
+    // store RAMP RPS in variables ramp3RPSX, ramp3RPSY, ramp3RPSZ
+    ramp3RPSX = RPS.X();
+    ramp3RPSY = RPS.Y();
+    ramp3RPSZ = RPS.Heading();
+
+
+    LCD.WriteLine(" ");
+    LCD.Write("X: ");
+    LCD.WriteLine(ramp3RPSX);
+    LCD.Write("Y: ");
+    LCD.WriteLine(ramp3RPSY);
+    LCD.Write("Z: ");
+    LCD.WriteLine(ramp3RPSZ);
+    Sleep(2.0);
+    LCD.Clear();
+
+
+    // touch screen to store RAMP 4 RPS
+    LCD.WriteLine("Press bump switch to store RPS at the bottom of the RAMP. ");
+    while (bump.Value() == true);
+    // store RAMP RPS in variables ramp4RPSX, ramp4RPSY, ramp4RPSZ
+    ramp4RPSX = RPS.X();
+    ramp4RPSY = RPS.Y();
+    ramp4RPSZ = RPS.Heading();
+
+
+    LCD.WriteLine(" ");
+    LCD.Write("X: ");
+    LCD.WriteLine(ramp4RPSX);
+    LCD.Write("Y: ");
+    LCD.WriteLine(ramp4RPSY);
+    LCD.Write("Z: ");
+    LCD.WriteLine(ramp4RPSZ);
+
+
+    Sleep(2.0);
+    LCD.Clear();
+
+
+    LCD.WriteLine("RPS checks completed. ");
+    Sleep(2.0);
+    LCD.Clear();
+
+
+    ///******************* COURSE PROGRAM *******************\\\
+
+
+    ////COURSE PROGRAM\\\\
+    LCD.WriteLine("Waiting for start light.");
+
+
+    // read CdS values until start light detected
+    int stop = 0;
+    while(!stop)
+    {
+        // if the CdS cell senses a light
+        if(cds.Value() < 0.7)
+        {
+            // exit the while loop
+            stop = 1;
+
+
+            LCD.WriteLine("Start light detected. ");
+
+
+            LCD.Clear();
+            LCD.SetBackgroundColor(SCARLET);
+        }
+    }
+
+
+    LCD.Clear();
+    LCD.SetBackgroundColor(BLACK);
+
+
+    // move forwards out of starting box
+    move_forwards(40, 40, 0, 150);
+    Sleep(0.2);
+
+
+    ///******************* COIN SLOT TASK *******************\\\
+
+
+    LCD.WriteLine("Getting ready for coin slot task. ");
+
+
+    // use RPS to position coin slot task
+    check_heading(coinRPSZ);
+    check_x_minus(coinRPSX); // 14.8
+    check_y_plus(coinRPSY); // 16.3
+
+
+    // drive towards coin slot
+    move_forwards(40,40, 0, 100);
+    Sleep(0.5);
+
+
+    // deposit coin
+    arm_down(140);
+    Sleep(0.5);
+    arm_down(150);
+    Sleep(0.5);
+    arm_down(160);
+
+
+    LCD.WriteLine("Coin deposited. ");
+
+
+    // move servo arm up
+    arm_up(60);
+
+
+    ///******************* COIN SLOT TO DDR TRANSITION *******************\\\
+
+
+    LCD.WriteLine("Moving to DDR machine. ");
+
+
+    // move backwards towards DDR machine
+    move_backwards(40, 40, 0, 180);
+    Sleep(0.3);
+    // pivot to face the right wall
+    pivot_cw(45, piv90);
+    Sleep(0.2);
+    // move towards light sensor
+    move_forwards(40, 40, 0, 70);
+    Sleep(0.5);
+
+
+    ///******************* DDR MACHINE *******************\\\
+
+
+    // keep correcting position until a light is sensed
+    while(cds.Value() > 1.2)
+    {
+        check_heading(179.8);
+
+
+        if(RPS.X() > 19.099)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            move_backwards(20, 20, 0, 3);
+        }
+
+
+        else if(RPS.X() < 19.099)
+        {
+            // pulse the motors for a short duration in the correct direction
+            Sleep(0.25);
+            move_forwards(20, 20, 0, 3);
+        }
+
+
+        Sleep(0.25);
+
+
+        // check whether the robot is within an acceptable range
+        while(RPS.Y() < 13.59- 0.25 || RPS.Y() > 13.59+ 0.25)
+        {
+            if(RPS.Y() > 13.59)
+            {
+                // pulse the motors for a short duration in the correct direction
+                Sleep(0.25);
+                move_sideways('r', 3);
+            }
+
+
+            else if(RPS.Y() < 13.59)
+            {
+                // pulse the motors for a short duration in the correct direction
+                move_sideways('l', 3);
+            }
+
+
+            Sleep(0.25);
+        }
+    } // end light sensing loop
+
+
+    // sense DDR light
+    LCD.WriteLine("Ready to read in light. ");
+    Sleep(0.50);
+    if(cds.Value() < 1.5)
+    {
+        Sleep(1.0);
+    }
+
+
+    // read in CdS value
+    float saveValue = cds.Value();
+
+
+    // if CdS value is RED
+    if (saveValue <.3 )
+    {
+        LCD.WriteLine("Light is red. ");
+        Sleep(0.5);
+        move_forwards(40,40,0, 40);
+        // turn so back wheel faces button
+        pivot_ccw(45, piv90);
+        Sleep(0.5);
+        Sleep(0.5);
+        // press RED button
+
+
+        move_backwards(40,42,0,70);
+        Sleep(4.0);
+
+
+        move_forwards(40,42,0,45); // move away from button
+        pivot_ccw(45,piv180);
+        Sleep(0.5);
+        move_sideways('l',10);
+        Sleep(0.5);
+        check_heading(90);
+        Sleep(0.5);
+        move_forwards(40,40,0,40);
+        Sleep(0.5);
+
+
+        // press the white RPS button
+        check_heading(wbRPSZ);
+        check_x_plus(wbRPSX);
+
+
+        Sleep(0.5);
+        arm_down(140);
+        Sleep(4.0); // hold button for 30s of upper level RPS
+        arm_up(60);
+        Sleep(0.5);
+        move_backwards(40,40,0,7);
+        Sleep(0.5);
+        pivot_cw(45,piv180);
+        Sleep(0.5);
+        move_sideways('r',25);
+    }
+
+
+    // if CdS value is BLUE
+    else if (saveValue >.8)
+    {
+        LCD.WriteLine("Light is blue. ");
+        Sleep(0.5);
+        move_forwards(40,40,0, 115);
+        // turn so back wheel faces button
+        pivot_ccw(45,piv90);
+        Sleep(0.5);
+        // press BLUE button
+
+
+        move_backwards(40,42,0,70);
+        Sleep(5.0);
+
+
+        move_forwards(40,43,0,45); // move away from button
+        pivot_ccw(45,piv180);
+        Sleep(0.5);
+        move_sideways('r',30);
+        Sleep(0.5);
+        check_heading(90);
+        Sleep(0.5);
+        move_forwards(40,40,0,35);
+        Sleep(0.5);
+
+
+        // press the white RPS button
+        check_heading(wbRPSZ);
+        check_x_plus(wbRPSX);
+
+
+        Sleep(0.5);
+        arm_down(140);
+        Sleep(4.0); // hold button for 30s of upper level RPS
+        arm_up(60);
+        Sleep(0.5);
+        move_backwards(40,40,0,7);
+        Sleep(0.5);
+        pivot_cw(45,piv180);
+        Sleep(0.5);
+        move_sideways('r',25);
+    }
+
+
+    // default RED light
+    else
+    {
+        LCD.WriteLine("Unable to read in light. Light is red on default. ");
+        Sleep(0.5);
+        move_forwards(40,40,0, 40);
+        // turn so back wheel faces button
+        pivot_ccw(45, piv90);
+        Sleep(0.5);
+        Sleep(0.5);
+        // press RED button
+
+
+        move_backwards(40,42,0,100);
+        Sleep(5.0);
+
+
+        move_forwards(40,42,0,45); // move away from button
+        pivot_ccw(45,piv180);
+        Sleep(0.5);
+        move_sideways('l',10);
+        Sleep(0.5);
+        check_heading(90);
+        Sleep(0.5);
+        move_forwards(40,40,0,40);
+        Sleep(0.5);
+
+
+        // press the white RPS button
+        check_heading(wbRPSZ);
+        check_x_plus(wbRPSX);
+
+
+        Sleep(0.5);
+        arm_down(140); // hold button for 30s of upper level RPS
+        Sleep(4.0);
+        arm_up(60);
+        Sleep(0.5);
+        move_backwards(40,40,0,7);
+        Sleep(0.5);
+        pivot_cw(45,piv180);
+        Sleep(0.5);
+        move_sideways('r',25);
+    }
+
+
+    ///******************* DDR TO RAMP TRANSITION *******************\\\
+
+
+    LCD.WriteLine("Bottom of ramp. ");
+
+
+    // ramp RPS checks
+    check_y_plus(rampRPSY);
+    check_x_minus(rampRPSX);
+    check_heading(rampRPSZ);
+    Sleep(0.5);
+
+
+    // move up ramp
+    pivot_cw(45, piv180);
+    move_backwards(74,75,0,700); //go up RAMP
+    Sleep(1.0);
+    move_sideways('r',250);
+    LCD.WriteLine("Top of ramp. ");
+    check_heading(ramp2RPSZ);
+    check_x_plus(ramp2RPSX);
+    check_y_minus(ramp2RPSY);
+    Sleep(0.5);
+
+
+    ///******************* FOOSBALL SLIDERS *******************\\\
+
+
+    // move forward to pivot ccw in front of the sliders
+
+
+    move_backwards(60,60,0,230); // move backwards towards sliders
+    Sleep(0.5);
+    move_sideways('r', 5);
+    Sleep(0.5);
+    move_backwards(60,60,0,20);
+    Sleep(0.5); // move backwards towards sliders
+
+
+    // move sliders
+    move_sideways('r',110);
+    Sleep(0.3);
+    move_forwards(60,60,0,15);
+    Sleep(0.3);
+    if(RPS.Heading() == -1)
+    {
+        Sleep(1.0);
+    }
+    else
+    {
+        check_heading(foosRPSZ);
+    }
+    Sleep(0.3);
+    move_sideways('l',95);
+    Sleep(0.3);
+    move_backwards(60,60,0,60);
+    Sleep(1.5);
+
+
+    // move sliders pt. 2
+    move_sideways('r',105);
+    Sleep(0.5);
+    // stop all motors to prevent stalling
+    right_motor.Stop();
+    left_motor.Stop();
+    back_motor.Stop();
+
+
+    check_heading(foosRPSZ);
+
+
+    ///******************* FOOSBALL TO LEVER TRANSITION *******************\\\
+
+
+    move_forwards(30,30,0,40);
+    Sleep(0.2);
+    pivot_cw(45,piv90);
+
+
+    LCD.WriteLine("Facing lever. ");
+    Sleep(0.5);
+    move_forwards(45,45,0, 200); // drive towards the lever
+    Sleep(0.5);
+    pivot_cw(45,30);
+    move_backwards(45,45,0,25);
+    move_sideways('l',20);
+    LCD.WriteLine("In front of lever. Ready to flip. ");
+
+
+    ///******************* LEVER FLIP *******************\\\
+
+
+    // flip lever
+    arm_down(160);
+    LCD.WriteLine("Lever flipped. ");
+    Sleep(0.5);
+    arm_up(80);
+    move_forwards(45,45,0, 10);
+    Sleep(0.2);
+    move_sideways('r', 10);
+    Sleep(0.5);
+    arm_down(160);
+    LCD.WriteLine("Lever flipped. ");
+    Sleep(0.5);
+    arm_up(80);
+    Sleep(0.5);
+
+
+    ///******************* LEVER TO RAMP TRANSITION *******************\\\
+
+
+    move_sideways('r', 20);
+    Sleep(0.5);
+    pivot_ccw(45,30);
+    Sleep(0.5);
+    move_backwards(45,43,0,350); // drive backwards towards the ramp
+    Sleep(0.75);
+    pivot_ccw(45,piv90); // pivot to face the DDR machine
+    if(RPS.Heading() == -1)
+    {
+        Sleep(1.0);
+    }
+    else
+    {
+        check_heading(ramp3RPSZ);
+    }
+    move_sideways('r',15);
+    move_forwards(75,75,0,150);
+    Sleep(0.75);
+    check_heading(ramp3RPSZ);
+    check_x_plus(ramp3RPSX);
+    check_x_minus(ramp3RPSY);
+
+
+    LCD.WriteLine("Preparing to descend ramp. ");
+
+
+    ///******************* RAMP TO BUTTON TRANSITION *******************\\\
+    move_backwards(45,45,0,15);
+    Sleep(0.2);
+    move_forwards(75,75,0,600); // move down ramp
+    Sleep(1.0);
+    check_heading(90);
+    move_sideways('r',220);
+    // move sideways towards the final button
+    Sleep(1.0);
+    LCD.WriteLine("Moving towards final button. ");
+    move_forwards(42,40,0,200);
+    check_x_plus(0);
+    check_y_minus(0);
+}
+
